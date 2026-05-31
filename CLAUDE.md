@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 [CVAT](https://github.com/cvat-ai/cvat) (Computer Vision Annotation Tool) is a self-hosted annotation platform — a monorepo with a Django REST backend, a React/TypeScript frontend (Yarn workspaces), and a Python SDK/CLI.
 
-**This checkout is customized for ground-truth annotation in the `line-extraction-benchmark` project** — ceiling structural-line GT (polyline segments) for a line-extraction VSLAM benchmark on `dataset/fassto_up` (VGA 640×480). The annotation contract lives at `~/repositories/obsidian-note/note/Output/projects/line-extraction-benchmark/gt-annotation-guideline.html` (vault project page: `wiki/projects/line-extraction-benchmark.md`). The customizations exist to support that guideline's workflow: a CLAHE *reference view*, fast line drawing, and (planned) mandatory **edge correction** (snap drawn lines to the image gradient edge).
+**This checkout is customized for ground-truth annotation in the `line-extraction-benchmark` project** — ceiling structural-line GT (polyline segments) for a line-extraction VSLAM benchmark on `dataset/fassto_up` (VGA 640×480). The annotation contract lives at `~/repositories/obsidian-note/note/Output/projects/line-extraction-benchmark/gt-annotation-guideline.html` (vault project page: `wiki/projects/line-extraction-benchmark.md`). Two pieces support that guideline's workflow: (1) **done** — an OpenCV *reference view* in the OpenCV tool's Image tab (CLAHE→Unsharp preset for judging faint lines per §6/§10, plus Sobel/Canny gradient previews); (2) **planned** — the guideline's mandatory **edge correction** (§7), built as offline post-processing that snaps drawn lines to the *original-image* gradient edge (not a live CVAT tool). See the Appendix for status.
 
 ## Environment
 
@@ -94,9 +94,14 @@ line_segment_automatic_annotation/  # local pylsd auto-annotation script (custom
 
 ### 2026-05-31 — OpenCV "Image" tab filters added
 
-Added 4 client-side filters to the OpenCV tool's Image tab, modeled on the existing Histogram Equalization:
-- **Grayscale, Gaussian blur, CLAHE, Canny edge** — `cvat-core/src/opencv/{grayscale,gaussian-blur,clahe,canny-edge}.ts`, registered in `opencv-interface.ts`, aliased in `cvat-ui/src/utils/image-processing.tsx`, toggled via `opencv-control.tsx` (`renderImageToolButton`).
-- All run **in-browser (OpenCV.js)**, per frame; parameterless toggles with sensible defaults + a `configure()` hook for future sliders. Confirmed `GaussianBlur`/`Canny`/`CLAHE` exist in the bundled opencv.js by loading it in Node. CLAHE is for the guideline's §6/§10 "CLAHE reference view".
+Added 5 client-side filters to the OpenCV tool's Image tab, modeled on the existing Histogram Equalization:
+- **Grayscale, Gaussian blur, CLAHE, Canny edge, Sobel (ksize 3 and 5)** — `cvat-core/src/opencv/{grayscale,gaussian-blur,clahe,canny-edge,sobel}.ts`, registered in `opencv-interface.ts`, aliased in `cvat-ui/src/utils/image-processing.tsx`, toggled via `opencv-control.tsx` (`renderImageToolButton`). The Sobel factory takes a kernel size (`imgproc.sobel(3)` / `sobel(5)`) and the two sizes are separate toggles with distinct aliases (`SOBEL_3`/`SOBEL_5`).
+- All run **in-browser (OpenCV.js)**, per frame; parameterless toggles with sensible defaults + a `configure()` hook for future sliders. Confirmed `GaussianBlur`/`Canny`/`CLAHE`/`Sobel`/`convertScaleAbs`/`addWeighted` exist in the bundled opencv.js by loading it in Node. CLAHE = guideline §6/§10 "CLAHE reference view"; Sobel renders |Gx|+|Gy| gradient magnitude — a preview of where the planned edge-correction has signal.
+
+### 2026-05-31 — Unsharp mask + "Reference view" preset
+
+- **Unsharp mask** (`cvat-core/src/opencv/unsharp-mask.ts`, `(1+amount)*src − amount*GaussianBlur(src)`) added as a toggle — completes the guideline's §10 CLAHE→Unsharp combo (filters chain in `canvas-wrapper.tsx`, so no combo logic needed).
+- **"Reference view" preset button** (`renderReferenceViewButton` in `opencv-control.tsx`) toggles CLAHE + Unsharp together; active = both present. Because `ENABLE_IMAGE_FILTER` appends without dedup, the handler disables any existing CLAHE/Unsharp first, then re-enables in **CLAHE→Unsharp order**. Image tab now has 8 toggles + the preset.
 
 ### 2026-05-31 — pylsd line-segment auto-annotation script
 
@@ -104,8 +109,18 @@ Added 4 client-side filters to the OpenCV tool's Image tab, modeled on the exist
 
 ## Appendix: follow-up analyses
 
-1. **Edge-correction polyline action** (planned, primary) — a `BaseShapesAction` implementing the guideline's mandatory §7 edge correction, ASM-style (Cootes profile-normal search): sample points along the drawn segment → search the **line-normal** direction for the gradient max (Devernay sub-pixel, on the **original** image, not a detector output) → robust line fit (RANSAC) → reproject endpoints **perpendicular-only** (don't slide along the line; endpoints are free-hanging at occlusions). Add a **confidence gate** to leave faint/textureless lines untouched. Output: per-line displacement (px) + faint-failure rate, for the pilot's §13 measurement (auto-postproc vs custom-live decision).
-2. **Synced dual-display (original | CLAHE)** — the guideline's §10 ideal; a larger UI custom feature, separate from the filter toggle already added.
+Work is split into **CVAT-side** (must be in-tool because it informs what the human draws) and **post-processing** (operates on exported coords + original images — simpler: full numpy/scipy/OpenCV-python, no WASM/TS). Items #4, #7, #8, #11, #12 from the original brainstorm were dropped as not worth it.
+
+**CVAT-side**: done (image filters + Unsharp + Reference-view preset — see Appendix: observations). The synced dual-pane (§10 ideal) was dropped; the CLAHE/Reference toggle is the accepted substitute.
+
+**Post-processing (offline Python on exported annotations — primary work)**
+1. **Edge correction** (§7, the guideline's "auto 후처리" arm — chosen over a live CVAT action: §7 says no manual redo, so live WYSIWYG isn't needed, and Python gets RANSAC/Devernay for free). ASM-style (Cootes profile-normal search): sample points along each drawn segment → search the **line-normal** for the gradient max (Devernay sub-pixel, on the **original** image, never a detector output) → robust line fit (RANSAC) → reproject endpoints **perpendicular-only** (don't slide along the line — endpoints are free-hanging at occlusions §4).
+   - **Policy: conservative no-snap.** When uncertain, leave the line exactly as drawn (user preference). Levers that bound mis-snapping: small search window `k < (parallel-line spacing)/2` (critical for dense tile grids), gradient-direction filter (accept only edges ~perpendicular to the line), RANSAC, and a confidence gate.
+   - **Diagnostics, not a single "failure rate"** (the rate conflates "auto can't" with "already good"). Classify each line into an **outcome state**: `corrected` / `already_aligned` (edge found, ~0 move) / `abstained_no_edge` (faint/textureless) / `abstained_ambiguous` (competing parallel edges). Log **per-line displacement (px)** — *collected and stored, not surfaced live*; the user hands the logs to the agent later (signal of annotation care, not a metric the annotator watches). Record the **gate thresholds/policy** with every run (outcomes depend heavily on policy).
+   - **Output**: corrected GT + per-line log (state + displacement + policy params) + **before/after overlay images** (original vs corrected line on the original frame, color-coded by outcome state) for eyeball QA.
+   - Data flow: pull polylines via `cvat-sdk` (or an export file) + load original images → correct/classify → write final GT + logs + overlays; optionally re-upload corrected shapes via SDK for a spot-check.
+2. **Minimum-length filter** (§5) — drop/flag segments `< 30px @640×480` (resolution-aware); fold in as an option of the post-processing script.
+3. *(optional)* **Automated consistency checks** (§8) — offline heuristics that flag suspicious frames (e.g., a tile-grid line with an unlabeled near-parallel neighbor).
 
 ## Appendix: pointers for the analyzing agent
 
