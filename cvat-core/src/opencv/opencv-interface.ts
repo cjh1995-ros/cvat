@@ -10,6 +10,8 @@ import GrayscaleImplementation from './grayscale';
 import GaussianBlurImplementation from './gaussian-blur';
 import CLAHEImplementation from './clahe';
 import CannyEdgeImplementation from './canny-edge';
+import SobelImplementation from './sobel';
+import UnsharpMaskImplementation from './unsharp-mask';
 import TrackerMILImplementation, {
     type TrackerMILInterface,
 } from './tracker-mil';
@@ -43,6 +45,8 @@ export interface OpenCVInterface {
         gaussianBlur: () => ImageProcessing;
         clahe: () => ImageProcessing;
         cannyEdge: () => ImageProcessing;
+        sobel: (kernelSize?: number) => ImageProcessing;
+        unsharpMask: () => ImageProcessing;
     };
     tracking: {
         trackerMIL: {
@@ -213,6 +217,8 @@ export function createOpenCVInterface(cv: any): OpenCVInterface {
             gaussianBlur: () => new GaussianBlurImplementation(cv),
             clahe: () => new CLAHEImplementation(cv),
             cannyEdge: () => new CannyEdgeImplementation(cv),
+            sobel: (kernelSize?: number) => new SobelImplementation(cv, kernelSize),
+            unsharpMask: () => new UnsharpMaskImplementation(cv),
         },
 
         tracking: {

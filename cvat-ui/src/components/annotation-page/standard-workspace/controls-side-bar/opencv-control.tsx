@@ -9,7 +9,8 @@ import { Row, Col } from 'antd/lib/grid';
 import Popover from 'antd/lib/popover';
 import Icon, {
     AreaChartOutlined, ScissorOutlined, BgColorsOutlined,
-    BlockOutlined, BarChartOutlined, BorderOutlined,
+    BlockOutlined, BarChartOutlined, BorderOutlined, FunctionOutlined,
+    ThunderboltOutlined, EyeOutlined,
 } from '@ant-design/icons';
 import Text from 'antd/lib/typography/Text';
 import Tabs from 'antd/lib/tabs';
@@ -416,6 +417,43 @@ class OpenCVControlComponent extends React.PureComponent<Props & DispatchToProps
         );
     }
 
+    private renderReferenceViewButton(): JSX.Element {
+        const { enableImageFilter, disableImageFilter, filters } = this.props;
+        const claheOn = !!hasFilter(filters, ImageFilterAlias.CLAHE);
+        const unsharpOn = !!hasFilter(filters, ImageFilterAlias.UNSHARP_MASK);
+        const active = claheOn && unsharpOn;
+        return (
+            <CVATTooltip title='Reference view (CLAHE + Unsharp)' className='cvat-opencv-image-tool-item'>
+                <Button
+                    className={active ?
+                        'cvat-opencv-reference-view-tool-button cvat-opencv-image-tool-active' :
+                        'cvat-opencv-reference-view-tool-button'}
+                    onClick={(e: React.MouseEvent<HTMLElement>) => {
+                        if (active) {
+                            (e.target as HTMLElement).blur();
+                            disableImageFilter(ImageFilterAlias.UNSHARP_MASK);
+                            disableImageFilter(ImageFilterAlias.CLAHE);
+                        } else {
+                            // normalize to CLAHE -> Unsharp order without duplicating (ENABLE appends)
+                            if (claheOn) disableImageFilter(ImageFilterAlias.CLAHE);
+                            if (unsharpOn) disableImageFilter(ImageFilterAlias.UNSHARP_MASK);
+                            enableImageFilter({
+                                modifier: openCVWrapper.imgproc.clahe(),
+                                alias: ImageFilterAlias.CLAHE,
+                            });
+                            enableImageFilter({
+                                modifier: openCVWrapper.imgproc.unsharpMask(),
+                                alias: ImageFilterAlias.UNSHARP_MASK,
+                            });
+                        }
+                    }}
+                >
+                    <EyeOutlined />
+                </Button>
+            </CVATTooltip>
+        );
+    }
+
     private renderImageContent():JSX.Element {
         return (
             <Row justify='start' gutter={[4, 4]}>
@@ -464,6 +502,36 @@ class OpenCVControlComponent extends React.PureComponent<Props & DispatchToProps
                         () => openCVWrapper.imgproc.cannyEdge(),
                         <BorderOutlined />,
                     )}
+                </Col>
+                <Col>
+                    {this.renderImageToolButton(
+                        'Sobel gradient (ksize 3)',
+                        'cvat-opencv-sobel3-tool-button',
+                        ImageFilterAlias.SOBEL_3,
+                        () => openCVWrapper.imgproc.sobel(3),
+                        <FunctionOutlined />,
+                    )}
+                </Col>
+                <Col>
+                    {this.renderImageToolButton(
+                        'Sobel gradient (ksize 5)',
+                        'cvat-opencv-sobel5-tool-button',
+                        ImageFilterAlias.SOBEL_5,
+                        () => openCVWrapper.imgproc.sobel(5),
+                        <FunctionOutlined />,
+                    )}
+                </Col>
+                <Col>
+                    {this.renderImageToolButton(
+                        'Unsharp mask',
+                        'cvat-opencv-unsharp-tool-button',
+                        ImageFilterAlias.UNSHARP_MASK,
+                        () => openCVWrapper.imgproc.unsharpMask(),
+                        <ThunderboltOutlined />,
+                    )}
+                </Col>
+                <Col>
+                    {this.renderReferenceViewButton()}
                 </Col>
             </Row>
         );

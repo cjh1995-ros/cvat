@@ -11,6 +11,9 @@ export enum ImageFilterAlias {
     GAUSSIAN_BLUR = 'opencv.gaussianBlur',
     CLAHE = 'opencv.clahe',
     CANNY_EDGE = 'opencv.cannyEdge',
+    SOBEL_3 = 'opencv.sobel3',
+    SOBEL_5 = 'opencv.sobel5',
+    UNSHARP_MASK = 'opencv.unsharpMask',
 }
 
 export interface ImageFilter {
