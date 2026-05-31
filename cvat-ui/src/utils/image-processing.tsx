@@ -7,6 +7,10 @@ import { ImageProcessing } from 'cvat-core-wrapper';
 export enum ImageFilterAlias {
     HISTOGRAM_EQUALIZATION = 'opencv.histogramEqualization',
     GAMMA_CORRECTION = 'fabric.gammaCorrection',
+    GRAYSCALE = 'opencv.grayscale',
+    GAUSSIAN_BLUR = 'opencv.gaussianBlur',
+    CLAHE = 'opencv.clahe',
+    CANNY_EDGE = 'opencv.cannyEdge',
 }
 
 export interface ImageFilter {

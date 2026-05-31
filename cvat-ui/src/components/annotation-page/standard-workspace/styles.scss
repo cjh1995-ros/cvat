@@ -261,6 +261,10 @@
     @extend .cvat-opencv-drawing-tool;
 }
 
+.cvat-opencv-image-tool-item {
+    @extend .cvat-opencv-drawing-tool;
+}
+
 .cvat-opencv-image-tool-active {
     color: #40a9ff;
     border-color: #40a9ff;

@@ -7,7 +7,10 @@ import React from 'react';
 import { connect } from 'react-redux';
 import { Row, Col } from 'antd/lib/grid';
 import Popover from 'antd/lib/popover';
-import Icon, { AreaChartOutlined, ScissorOutlined } from '@ant-design/icons';
+import Icon, {
+    AreaChartOutlined, ScissorOutlined, BgColorsOutlined,
+    BlockOutlined, BarChartOutlined, BorderOutlined,
+} from '@ant-design/icons';
 import Text from 'antd/lib/typography/Text';
 import Tabs from 'antd/lib/tabs';
 import Button from 'antd/lib/button';
@@ -21,7 +24,7 @@ import { throttle } from 'lodash';
 import { OpenCVIcon } from 'icons';
 import { Canvas, convertShapesForInteractor } from 'cvat-canvas-wrapper';
 import {
-    getCore, Job, ObjectState, ObjectType, ShapeType,
+    getCore, Job, ObjectState, ObjectType, ShapeType, ImageProcessing,
 } from 'cvat-core-wrapper';
 import openCVWrapper from 'utils/opencv-wrapper/opencv-wrapper';
 import {
@@ -384,33 +387,83 @@ class OpenCVControlComponent extends React.PureComponent<Props & DispatchToProps
         );
     }
 
-    private renderImageContent():JSX.Element {
+    private renderImageToolButton(
+        title: string,
+        buttonClassName: string,
+        alias: ImageFilterAlias,
+        createModifier: () => ImageProcessing,
+        icon: JSX.Element,
+        tooltipClassName = 'cvat-opencv-image-tool-item',
+    ): JSX.Element {
         const { enableImageFilter, disableImageFilter, filters } = this.props;
+        const active = !!hasFilter(filters, alias);
         return (
-            <Row justify='start'>
+            <CVATTooltip title={title} className={tooltipClassName}>
+                <Button
+                    className={active ? `${buttonClassName} cvat-opencv-image-tool-active` : buttonClassName}
+                    onClick={(e: React.MouseEvent<HTMLElement>) => {
+                        if (!hasFilter(filters, alias)) {
+                            enableImageFilter({ modifier: createModifier(), alias });
+                        } else {
+                            (e.target as HTMLElement).blur();
+                            disableImageFilter(alias);
+                        }
+                    }}
+                >
+                    {icon}
+                </Button>
+            </CVATTooltip>
+        );
+    }
+
+    private renderImageContent():JSX.Element {
+        return (
+            <Row justify='start' gutter={[4, 4]}>
                 <Col>
-                    <CVATTooltip title='Histogram equalization' className='cvat-opencv-image-tool'>
-                        <Button
-                            className={
-                                hasFilter(filters, ImageFilterAlias.HISTOGRAM_EQUALIZATION) ?
-                                    'cvat-opencv-histogram-tool-button cvat-opencv-image-tool-active' : 'cvat-opencv-histogram-tool-button'
-                            }
-                            onClick={(e: React.MouseEvent<HTMLElement>) => {
-                                if (!hasFilter(filters, ImageFilterAlias.HISTOGRAM_EQUALIZATION)) {
-                                    enableImageFilter({
-                                        modifier: openCVWrapper.imgproc.hist(),
-                                        alias: ImageFilterAlias.HISTOGRAM_EQUALIZATION,
-                                    });
-                                } else {
-                                    const button = e.target as HTMLElement;
-                                    button.blur();
-                                    disableImageFilter(ImageFilterAlias.HISTOGRAM_EQUALIZATION);
-                                }
-                            }}
-                        >
-                            <AreaChartOutlined />
-                        </Button>
-                    </CVATTooltip>
+                    {this.renderImageToolButton(
+                        'Histogram equalization',
+                        'cvat-opencv-histogram-tool-button',
+                        ImageFilterAlias.HISTOGRAM_EQUALIZATION,
+                        () => openCVWrapper.imgproc.hist(),
+                        <AreaChartOutlined />,
+                        'cvat-opencv-image-tool',
+                    )}
+                </Col>
+                <Col>
+                    {this.renderImageToolButton(
+                        'Grayscale',
+                        'cvat-opencv-grayscale-tool-button',
+                        ImageFilterAlias.GRAYSCALE,
+                        () => openCVWrapper.imgproc.grayscale(),
+                        <BgColorsOutlined />,
+                    )}
+                </Col>
+                <Col>
+                    {this.renderImageToolButton(
+                        'Gaussian blur',
+                        'cvat-opencv-gaussian-blur-tool-button',
+                        ImageFilterAlias.GAUSSIAN_BLUR,
+                        () => openCVWrapper.imgproc.gaussianBlur(),
+                        <BlockOutlined />,
+                    )}
+                </Col>
+                <Col>
+                    {this.renderImageToolButton(
+                        'CLAHE (adaptive histogram equalization)',
+                        'cvat-opencv-clahe-tool-button',
+                        ImageFilterAlias.CLAHE,
+                        () => openCVWrapper.imgproc.clahe(),
+                        <BarChartOutlined />,
+                    )}
+                </Col>
+                <Col>
+                    {this.renderImageToolButton(
+                        'Canny edge detection',
+                        'cvat-opencv-canny-edge-tool-button',
+                        ImageFilterAlias.CANNY_EDGE,
+                        () => openCVWrapper.imgproc.cannyEdge(),
+                        <BorderOutlined />,
+                    )}
                 </Col>
             </Row>
         );

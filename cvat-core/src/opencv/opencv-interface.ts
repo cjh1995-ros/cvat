@@ -6,6 +6,10 @@ import IntelligentScissorsImplementation, {
     type IntelligentScissorsInterface,
 } from './intelligent-scissors';
 import HistogramEqualizationImplementation from './histogram-equalization';
+import GrayscaleImplementation from './grayscale';
+import GaussianBlurImplementation from './gaussian-blur';
+import CLAHEImplementation from './clahe';
+import CannyEdgeImplementation from './canny-edge';
 import TrackerMILImplementation, {
     type TrackerMILInterface,
 } from './tracker-mil';
@@ -35,6 +39,10 @@ export interface OpenCVInterface {
     };
     imgproc: {
         hist: () => ImageProcessing;
+        grayscale: () => ImageProcessing;
+        gaussianBlur: () => ImageProcessing;
+        clahe: () => ImageProcessing;
+        cannyEdge: () => ImageProcessing;
     };
     tracking: {
         trackerMIL: {
@@ -201,6 +209,10 @@ export function createOpenCVInterface(cv: any): OpenCVInterface {
 
         imgproc: {
             hist: () => new HistogramEqualizationImplementation(cv),
+            grayscale: () => new GrayscaleImplementation(cv),
+            gaussianBlur: () => new GaussianBlurImplementation(cv),
+            clahe: () => new CLAHEImplementation(cv),
+            cannyEdge: () => new CannyEdgeImplementation(cv),
         },
 
         tracking: {
